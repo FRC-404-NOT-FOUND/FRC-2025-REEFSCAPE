@@ -1,128 +1,153 @@
+// RobotContainer.java
 package frc.robot;
 
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.StartEndCommand;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
+import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 import frc.robot.subsystems.AlgaeIntake;
+import frc.robot.subsystems.AlgaePivot;
+import frc.robot.subsystems.Climber;
 import frc.robot.subsystems.DriveSubsystem;
 import frc.robot.subsystems.Elevator;
-import frc.robot.subsystems.AlgaePivot;
 import frc.robot.Constants.OIConstants;
 
 public class RobotContainer {
-    private final DriveSubsystem m_robotDrive = new DriveSubsystem();
-    private final AlgaeIntake algaeIntake = new AlgaeIntake();
-    private final AlgaePivot algaePivot = new AlgaePivot();
-    private final Elevator elevator = new Elevator();
+  private final DriveSubsystem m_robotDrive = new DriveSubsystem();
+  private final AlgaeIntake algaeIntake = new AlgaeIntake();
+  private final AlgaePivot algaePivot = new AlgaePivot();
+  private final Elevator elevator = new Elevator();
+  private final Climber climber = new Climber();
 
-    XboxController m_driverController = new XboxController(OIConstants.kDriverControllerPort);
+  private final XboxController m_driverController =
+      new XboxController(OIConstants.kDriverControllerPort);
+  private final CommandXboxController m_commandController =
+      new CommandXboxController(OIConstants.kDriverControllerPort);
 
-    private Timer autonomousTimer = new Timer();
+  private final Timer autonomousTimer = new Timer();
 
-    public RobotContainer() {
-        configureButtonBindings();
+  public RobotContainer() {
+    configureButtonBindings();
 
-        m_robotDrive.setDefaultCommand(
-            new RunCommand(
-                () -> m_robotDrive.drive(
+    // Default drive uses live field-relative state from DriveSubsystem
+    m_robotDrive.setDefaultCommand(
+        new RunCommand(
+            () ->
+                m_robotDrive.drive(
                     -MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband),
                     -MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband),
                     -MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband),
-                    true),
-                m_robotDrive));
-    }
+                    m_robotDrive.isFieldRelative()),
+            m_robotDrive));
+  }
 
-    public void teleopInit() {
-        algaePivot.enableTeleopControl(); // Move algae pivot down
-        algaeIntake.holdIntake(); // Keep intake in hold mode when teleop starts
-        System.out.println("Teleoperated Mode Initialized: Algae pivot moving to down position, intake in hold mode.");
-    }
-    
+  public void teleopInit() {
+    algaePivot.enableTeleopControl(false);
+    climber.unlockClimb();
+    System.out.println("Teleoperated Mode Initialized: Algae pivot remains in position.");
+  }
 
-    public Elevator getElevator() {
-        return elevator;
-    }
-    
-    public void autonomousInit() {
-        algaePivot.disableTeleopControl(); // Keep algae pivot up
-        System.out.println("Autonomous Mode Initialized: Algae pivot locked in up position.");
-    
-        // Move elevator up
-        elevator.moveToPosition(Constants.Elevator.HOME_POSITION);
-        System.out.println("Autonomous Mode: Elevator moving to position 100.");
-    }
-    
-    private void configureButtonBindings() {
-        new JoystickButton(m_driverController, XboxController.Button.kX.value)
-            .onTrue(new RunCommand(algaeIntake::startIntake, algaeIntake));
+  public void autonomousInit() {
+    algaePivot.disableTeleopControl();
+    System.out.println("Autonomous Mode Initialized: Algae pivot locked in up position.");
+  }
 
-        new JoystickButton(m_driverController, XboxController.Button.kY.value)
-            .onTrue(new RunCommand(algaeIntake::holdIntake, algaeIntake));
+  public Elevator getElevator() {
+    return elevator;
+  }
 
-        new JoystickButton(m_driverController, XboxController.Button.kB.value)
-            .onTrue(new RunCommand(algaeIntake::startOuttake, algaeIntake));
+  private void configureButtonBindings() {
+    // Intake controls
+    new JoystickButton(m_driverController, XboxController.Button.kX.value)
+        .onTrue(new RunCommand(algaeIntake::startIntake, algaeIntake));
 
-        new JoystickButton(m_driverController, XboxController.Button.kA.value)
-            .onTrue(new RunCommand(algaeIntake::stop, algaeIntake));
+    new JoystickButton(m_driverController, XboxController.Button.kY.value)
+        .onTrue(new RunCommand(algaeIntake::holdIntake, algaeIntake));
 
-        new JoystickButton(m_driverController, XboxController.Button.kRightBumper.value)
-            .whileTrue(new RunCommand(elevator::moveUp, elevator))
-            .onFalse(new RunCommand(elevator::stop, elevator));
+    new JoystickButton(m_driverController, XboxController.Button.kB.value)
+        .onTrue(new RunCommand(algaeIntake::startOuttake, algaeIntake));
 
-        new JoystickButton(m_driverController, XboxController.Button.kLeftBumper.value)
-            .whileTrue(new RunCommand(elevator::moveDown, elevator))
-            .onFalse(new RunCommand(elevator::stop, elevator));
-        
-        new JoystickButton(m_driverController, XboxController.Button.kStart.value)
-            .onTrue(new RunCommand(() -> elevator.moveToPosition(100), elevator));
-    }
+    new JoystickButton(m_driverController, XboxController.Button.kA.value)
+        .onTrue(new RunCommand(algaeIntake::stop, algaeIntake));
 
-    public Command getAutonomousCommand() {
-        return new SequentialCommandGroup(
-            // Step 1: Move forward for 1 second
-           new StartEndCommand(
-             () -> m_robotDrive.drive(0.1, 0, 0, true),  // Start movement
-              () -> m_robotDrive.drive(0, 0, 0, true),    // Stop movement
-                m_robotDrive
-           ).withTimeout(1.0),
-    
-            // Step 2: Pause for 3 seconds
-            new WaitCommand(3.0),
-    
-            // Step 3: Move backward slightly to create space for elevator movement
-            new StartEndCommand(
-                () -> m_robotDrive.drive(-0.1, 0, 0, true),  // Start movement
-                 () -> m_robotDrive.drive(0, 0, 0, true),    // Stop movement
-                   m_robotDrive
-              ).withTimeout(1.0),
-    
-            // Step 4: Move elevator to position 
-            new InstantCommand(() -> algaePivot.enableTeleopControl()),
-            new InstantCommand(() -> elevator.moveToPosition(50), elevator),
-    
-            // Step 5: Start intake and move forward slightly
-            new RunCommand(() -> {
-                algaeIntake.startIntake();
-                m_robotDrive.drive(0.1, 0, 0, true); // Small forward movement
-            }, algaeIntake, m_robotDrive).withTimeout(1),
-    
-            // Step 6: Switch to hold mode and move back slightly
-            new RunCommand(() -> {
-                algaeIntake.holdIntake();
-                m_robotDrive.drive(-0.1, 0, 0, true); // Small backward movement
-            }, algaeIntake, m_robotDrive).withTimeout(3),
-    
+    // Elevator controls
+    new JoystickButton(m_driverController, XboxController.Button.kRightBumper.value)
+        .whileTrue(new RunCommand(elevator::moveUp, elevator))
+        .onFalse(new RunCommand(elevator::stop, elevator));
 
-            // Step 8: Ensure intake stays in hold mode indefinitely
-            new InstantCommand(algaeIntake::holdIntake, algaeIntake)
-        );
-    }    
+    new JoystickButton(m_driverController, XboxController.Button.kLeftBumper.value)
+        .whileTrue(new RunCommand(elevator::moveDown, elevator))
+        .onFalse(new RunCommand(elevator::stop, elevator));
 
+    // Algae pivot presets
+    new JoystickButton(m_driverController, XboxController.Button.kStart.value)
+        .onTrue(new InstantCommand(() -> algaePivot.setTargetPosition(Constants.AlgaePivot.UP_POSITION)));
+
+    new JoystickButton(m_driverController, XboxController.Button.kBack.value)
+        .onTrue(new InstantCommand(() -> algaePivot.setTargetPosition(Constants.AlgaePivot.DOWN_POSITION)));
+
+    // Climber controls (CommandXboxController triggers)
+    m_commandController.leftTrigger()
+        .whileTrue(new RunCommand(climber::moveBackward, climber))
+        .onFalse(new RunCommand(climber::stop, climber));
+
+    m_commandController.rightTrigger()
+        .whileTrue(new RunCommand(climber::moveForward, climber))
+        .onFalse(new RunCommand(climber::stop, climber));
+
+    // >>> Field-oriented toggle on Right Stick press <<<
+    new JoystickButton(m_driverController, XboxController.Button.kRightStick.value)
+        .onTrue(new InstantCommand(m_robotDrive::toggleFieldRelative));
+  }
+
+  public SequentialCommandGroup getAutonomousCommand() {
+    return new SequentialCommandGroup(
+        new StartEndCommand(() -> m_robotDrive.drive(0.4, 0, 0, true),
+                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+            .withTimeout(1.325),
+        new WaitCommand(1),
+        new StartEndCommand(() -> m_robotDrive.drive(-0.1, 0, 0, true),
+                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+            .withTimeout(1),
+        new InstantCommand(() -> algaePivot.enableTeleopControl(true)),
+        new WaitCommand(0.5),
+        new InstantCommand(() -> elevator.moveToPosition(215)),
+        new WaitUntilCommand(() -> Math.abs(elevator.getCurrentPosition() - 225) < 10),
+        new InstantCommand(() -> {
+          System.out.println("Intake Started!");
+          algaeIntake.startIntake();
+        }, algaeIntake),
+        new WaitCommand(0.5),
+        new StartEndCommand(() -> m_robotDrive.drive(0.1, 0, 0, true),
+                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+            .withTimeout(1),
+        new WaitCommand(0.5),
+        new InstantCommand(algaeIntake::holdIntake, algaeIntake),
+        new StartEndCommand(() -> m_robotDrive.drive(-0.1, 0, 0, true),
+                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+            .withTimeout(1),
+        new StartEndCommand(() -> m_robotDrive.drive(0, 0, 0.25, true),
+                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+            .withTimeout(1.0),
+        new ParallelCommandGroup(
+            new StartEndCommand(() -> m_robotDrive.drive(0.3, 0, 0, true),
+                                () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+                .withTimeout(2.65),
+            new InstantCommand(() -> {
+              System.out.println("Lowering elevator to position 80...");
+              elevator.moveToPosition(80);
+            })
+        ),
+        new WaitUntilCommand(() -> Math.abs(elevator.getCurrentPosition() - 80) < 10),
+        new InstantCommand(algaeIntake::startOuttake, algaeIntake)
+    );
+  }
 }

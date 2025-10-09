@@ -2,51 +2,49 @@ package frc.robot.subsystems;
 
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
-import com.revrobotics.RelativeEncoder;
 import frc.robot.Constants;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import edu.wpi.first.math.controller.PIDController;
-
-
+import com.revrobotics.spark.config.SparkMaxConfig;
+import com.revrobotics.spark.config.SoftLimitConfig;
 
 public class Elevator extends SubsystemBase {
     private final SparkMax leftMotor;
     private final SparkMax rightMotor;
 
-    //START OF ADAM CODE
-    private final double kP = 0.1;
-    private final double kI = 0.0;
-    private final double kD = 0.0;
-    PIDController pidElevator = new PIDController(kP, kI, kD);
+    private final SparkMaxConfig leftMotorConfig;
+    private final SparkMaxConfig rightMotorConfig;
 
-    private final RelativeEncoder leftEncoder;
-    private final RelativeEncoder rightEncoder;
-    //END OF ADAM CODE
-    
-    private final double kManualSpeed = 6;
-    //START OF SPENCER CODE
-    //private final double kP = 0.05;
-    //END OF SPENCER CODE
-    private final double DEAD_BAND = 1.0;
+    private final double kManualSpeed = 1;
+    private final double kP = 5.0; // Increased kP for faster response
+    private final double DEAD_BAND = 5; // Increased deadband to prevent overshooting
+    private final double MIN_OUTPUT = 0.3; // Minimum output to overcome static friction
+    private final double FEEDFORWARD = 2.0; // Added feedforward to increase speed
 
     public Elevator() {
         leftMotor = new SparkMax(Constants.Elevator.LEFT_ELEVATOR_CAN_ID, MotorType.kBrushless);
         rightMotor = new SparkMax(Constants.Elevator.RIGHT_ELEVATOR_CAN_ID, MotorType.kBrushless);
 
-        rightMotor.setInverted(true);
-        leftMotor.setInverted(true);
         
-        //START OF ADAM CODE
-        leftEncoder = leftMotor.getEncoder();
-        rightEncoder = rightMotor.getEncoder();
-    
-        leftEncoder.setPosition(0);
-        rightEncoder.setPosition(0);
-        //END OF ADAM CODE
+        leftMotorConfig = new SparkMaxConfig();
+        leftMotorConfig.idleMode(SparkMaxConfig.IdleMode.kBrake);
+        leftMotorConfig.inverted(true);
+        leftMotorConfig.softLimit.reverseSoftLimit(0).reverseSoftLimitEnabled(true);
+        leftMotorConfig.softLimit.forwardSoftLimit(370).forwardSoftLimitEnabled(true);
+
+        rightMotorConfig = new SparkMaxConfig();
+        rightMotorConfig.inverted(true);
+        rightMotorConfig.idleMode(SparkMaxConfig.IdleMode.kBrake);
+        rightMotorConfig.softLimit.reverseSoftLimit(0).reverseSoftLimitEnabled(true);
+        rightMotorConfig.softLimit.forwardSoftLimit(370).forwardSoftLimitEnabled(true);
+
+        leftMotor.configure(leftMotorConfig, SparkMax.ResetMode.kResetSafeParameters, SparkMax.PersistMode.kPersistParameters);
+        rightMotor.configure(rightMotorConfig, SparkMax.ResetMode.kResetSafeParameters, SparkMax.PersistMode.kPersistParameters);
+        
+        
     }
 
-    private double getCurrentPosition() {
-        return leftMotor.getEncoder().getPosition(); 
+    public double getCurrentPosition() {
+        return leftMotor.getEncoder().getPosition();
     }
 
     public void moveUp() {
@@ -64,32 +62,41 @@ public class Elevator extends SubsystemBase {
     }
 
     public void moveToPosition(double position) {
-        //BEGINNING OF SPENCER CODE
-        /*
-        double error = position - getCurrentPosition();
-        double output = kP * error;
+        new Thread(() -> {
+            while (true) {
+                double current = getCurrentPosition();
+                double error = position - current;
 
-        if (Math.abs(error) < DEAD_BAND) {
-            stop();
-            return;
-        }
+                System.out.println("Elevator current: " + current + ", target: " + position + ", error: " + error);
 
-        if (output > kManualSpeed) output = kManualSpeed;
-        if (output < -kManualSpeed) output = -kManualSpeed;
+                // Stop the elevator if within deadband
+                if (Math.abs(error) < DEAD_BAND) {
+                    System.out.println("Elevator reached target. Stopping.");
+                    stop();
+                    break;
+                }
 
-        leftMotor.set(output);
-        rightMotor.set(output);
-        */
-        //END OF SPENCER CODE
+                double output = (kP * error) + FEEDFORWARD;
 
-        //START OF ADAM CODE
-        double speed = pidElevator.calculate(leftEncoder.getPosition(), position);
-        speed = Math.max(-10, Math.min(10, speed)); // Limit speed
+                // Ensure a minimum output to overcome static friction
+                if (Math.abs(output) < MIN_OUTPUT) {
+                    output = Math.copySign(MIN_OUTPUT, output);
+                }
 
-        leftMotor.set(speed);
-        rightMotor.set(speed);
+                // Limit output to max manual speed
+                if (output > kManualSpeed) output = kManualSpeed;
+                if (output < -kManualSpeed) output = -kManualSpeed;
 
-        //END OF ADAM CODE
+                leftMotor.set(output);
+                rightMotor.set(output);
+
+                try {
+                    Thread.sleep(50); // Update every 50ms
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
     }
 
     public void stop() {

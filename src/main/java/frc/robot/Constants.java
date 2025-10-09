@@ -103,10 +103,16 @@ public final class Constants {
     public static final double FIRST_POSITION = 225.0;
     public static final double SHOOT_POSITION = 80.0;
 
-    public static final double HOME_POSITION = 45.0;
+    public static final double HOME_POSITION = 0;
 
     public static final int LEFT_ELEVATOR_CAN_ID = 5;
     public static final int RIGHT_ELEVATOR_CAN_ID = 6;
+
 }
+
+  public static final class ClimberConstants {
+    public static final int CLIMBER_CAN_ID = 13;
+    public static final int CLIMBER_SERVO_CHANNEL = 9;
+  }
 
 }
