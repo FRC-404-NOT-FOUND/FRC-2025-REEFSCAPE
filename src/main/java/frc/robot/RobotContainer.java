@@ -1,4 +1,3 @@
-// RobotContainer.java
 package frc.robot;
 
 import edu.wpi.first.math.MathUtil;
@@ -36,8 +35,6 @@ public class RobotContainer {
 
   public RobotContainer() {
     configureButtonBindings();
-
-    // Default drive uses live field-relative state from DriveSubsystem
     m_robotDrive.setDefaultCommand(
         new RunCommand(
             () ->
@@ -65,7 +62,6 @@ public class RobotContainer {
   }
 
   private void configureButtonBindings() {
-    // Intake controls
     new JoystickButton(m_driverController, XboxController.Button.kX.value)
         .onTrue(new RunCommand(algaeIntake::startIntake, algaeIntake));
 
@@ -78,7 +74,6 @@ public class RobotContainer {
     new JoystickButton(m_driverController, XboxController.Button.kA.value)
         .onTrue(new RunCommand(algaeIntake::stop, algaeIntake));
 
-    // Elevator controls
     new JoystickButton(m_driverController, XboxController.Button.kRightBumper.value)
         .whileTrue(new RunCommand(elevator::moveUp, elevator))
         .onFalse(new RunCommand(elevator::stop, elevator));
@@ -87,14 +82,12 @@ public class RobotContainer {
         .whileTrue(new RunCommand(elevator::moveDown, elevator))
         .onFalse(new RunCommand(elevator::stop, elevator));
 
-    // Algae pivot presets
     new JoystickButton(m_driverController, XboxController.Button.kStart.value)
         .onTrue(new InstantCommand(() -> algaePivot.setTargetPosition(Constants.AlgaePivot.UP_POSITION)));
 
     new JoystickButton(m_driverController, XboxController.Button.kBack.value)
         .onTrue(new InstantCommand(() -> algaePivot.setTargetPosition(Constants.AlgaePivot.DOWN_POSITION)));
 
-    // Climber controls (CommandXboxController triggers)
     m_commandController.leftTrigger()
         .whileTrue(new RunCommand(climber::moveBackward, climber))
         .onFalse(new RunCommand(climber::stop, climber));
@@ -103,19 +96,18 @@ public class RobotContainer {
         .whileTrue(new RunCommand(climber::moveForward, climber))
         .onFalse(new RunCommand(climber::stop, climber));
 
-    // >>> Field-oriented toggle on Right Stick press <<<
     new JoystickButton(m_driverController, XboxController.Button.kRightStick.value)
         .onTrue(new InstantCommand(m_robotDrive::toggleFieldRelative));
   }
 
   public SequentialCommandGroup getAutonomousCommand() {
     return new SequentialCommandGroup(
-        new StartEndCommand(() -> m_robotDrive.drive(0.4, 0, 0, true),
-                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+        new StartEndCommand(() -> m_robotDrive.drive(0.4, 0, 0, false),
+                            () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1.325),
         new WaitCommand(1),
-        new StartEndCommand(() -> m_robotDrive.drive(-0.1, 0, 0, true),
-                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+        new StartEndCommand(() -> m_robotDrive.drive(-0.1, 0, 0, false),
+                            () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1),
         new InstantCommand(() -> algaePivot.enableTeleopControl(true)),
         new WaitCommand(0.5),
@@ -126,20 +118,20 @@ public class RobotContainer {
           algaeIntake.startIntake();
         }, algaeIntake),
         new WaitCommand(0.5),
-        new StartEndCommand(() -> m_robotDrive.drive(0.1, 0, 0, true),
-                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+        new StartEndCommand(() -> m_robotDrive.drive(0.1, 0, 0, false),
+                            () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1),
         new WaitCommand(0.5),
         new InstantCommand(algaeIntake::holdIntake, algaeIntake),
-        new StartEndCommand(() -> m_robotDrive.drive(-0.1, 0, 0, true),
-                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+        new StartEndCommand(() -> m_robotDrive.drive(-0.1, 0, 0, false),
+                            () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1),
-        new StartEndCommand(() -> m_robotDrive.drive(0, 0, 0.25, true),
-                            () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+        new StartEndCommand(() -> m_robotDrive.drive(0, 0, 0.25, false),
+                            () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1.0),
         new ParallelCommandGroup(
-            new StartEndCommand(() -> m_robotDrive.drive(0.3, 0, 0, true),
-                                () -> m_robotDrive.drive(0, 0, 0, true), m_robotDrive)
+            new StartEndCommand(() -> m_robotDrive.drive(0.3, 0, 0, false),
+                                () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
                 .withTimeout(2.65),
             new InstantCommand(() -> {
               System.out.println("Lowering elevator to position 80...");

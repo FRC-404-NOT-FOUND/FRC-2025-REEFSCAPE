@@ -12,9 +12,9 @@ public class AlgaePivot extends SubsystemBase {
     private double targetPosition;
     private boolean isTeleopEnabled = false;
 
-    private final double kP = 0.05;
+    private final double kP = 0.02;
     private final double kMaxSpeed = 0.2;
-    private final double DEAD_BAND = 0.1;
+    private final double DEAD_BAND = 0.5;
 
     public AlgaePivot() {
         pivotMotor = new SparkMax(Constants.AlgaePivot.PIVOT_MOTOR_CAN_ID, MotorType.kBrushless);
