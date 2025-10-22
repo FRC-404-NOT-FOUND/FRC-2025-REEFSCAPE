@@ -34,4 +34,5 @@ public class AlgaeIntake extends SubsystemBase {
         leftMotor.set(0);  // Full stop for both motors
         rightMotor.set(0); 
     }
+
 }
