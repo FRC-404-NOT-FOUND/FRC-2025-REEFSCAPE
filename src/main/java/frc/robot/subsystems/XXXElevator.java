@@ -1,140 +1,116 @@
 package frc.robot.subsystems;
 
-import edu.wpi.first.math.util.Units;
+import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
-import com.revrobotics.spark.config.SparkMaxConfig;
-import com.revrobotics.spark.config.SoftLimitConfig;
-import com.revrobotics.RelativeEncoder;
 import frc.robot.Constants;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import edu.wpi.first.math.controller.ElevatorFeedforward;
-import edu.wpi.first.math.controller.ProfiledPIDController;
-import edu.wpi.first.math.trajectory.TrapezoidProfile;
-import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.networktables.NetworkTableEntry;
+import com.revrobotics.spark.config.SparkMaxConfig;
+import com.revrobotics.spark.config.AlternateEncoderConfig;
+import com.revrobotics.spark.config.SoftLimitConfig;
 
 public class XXXElevator extends SubsystemBase {
     private final SparkMax leftMotor;
     private final SparkMax rightMotor;
     private final RelativeEncoder leftEncoder;
+    private final RelativeEncoder rightEncoder;
 
     private final SparkMaxConfig leftMotorConfig;
     private final SparkMaxConfig rightMotorConfig;
+    public final AlternateEncoderConfig encoderConfig;
 
-    private final NetworkTable table;
+    private final double kManualSpeed = 1;
+    private final double kP = 5.0; // Increased kP for faster response
+    private final double DEAD_BAND = 5; // Increased deadband to prevent overshooting
+    private final double MIN_OUTPUT = 0.3; // Minimum output to overcome static friction
+    private final double FEEDFORWARD = 2.0; // Added feedforward to increase speed
 
-    private final NetworkTableEntry kPEntry, kIEntry, kDEntry;
-    private final NetworkTableEntry kSEntry, kGEntry, kVEntry, kAEntry;
-    private final NetworkTableEntry profiledSetpointEntry, setpointEntry, encoderPositionEntry, pidOutputEntry, feedforwardOutputEntry;
-
-    private double kP = 0.0, kI = 0.0, kD = 0.0;
-    private double kS = 0.0, kG = 0.21, kV = 0.5, kA = 0.0;
-
-    private ElevatorFeedforward feedforward;
-    private ProfiledPIDController pidElevator;
-
-    private final double kManualSpeed = 3;
-    
     public XXXElevator() {
         leftMotor = new SparkMax(Constants.Elevator.LEFT_ELEVATOR_CAN_ID, MotorType.kBrushless);
         rightMotor = new SparkMax(Constants.Elevator.RIGHT_ELEVATOR_CAN_ID, MotorType.kBrushless);
         leftEncoder = leftMotor.getEncoder();
+        rightEncoder = rightMotor.getEncoder();
+        encoderConfig = new AlternateEncoderConfig();
 
+        
         leftMotorConfig = new SparkMaxConfig();
-        leftMotorConfig.encoder.positionConversionFactor(Units.inchesToMeters((Math.PI * 1.896) / 81));
         leftMotorConfig.idleMode(SparkMaxConfig.IdleMode.kBrake);
         leftMotorConfig.inverted(true);
-        leftMotorConfig.softLimit.reverseSoftLimit(0).reverseSoftLimitEnabled(true);
+        leftMotorConfig.softLimit.reverseSoftLimit(30).reverseSoftLimitEnabled(true);
+        leftMotorConfig.softLimit.forwardSoftLimit(370).forwardSoftLimitEnabled(true);
 
         rightMotorConfig = new SparkMaxConfig();
-        rightMotorConfig.follow(Constants.Elevator.LEFT_ELEVATOR_CAN_ID);
         rightMotorConfig.inverted(true);
         rightMotorConfig.idleMode(SparkMaxConfig.IdleMode.kBrake);
-        rightMotorConfig.softLimit.reverseSoftLimit(0).reverseSoftLimitEnabled(true);
+        rightMotorConfig.softLimit.reverseSoftLimit(30).reverseSoftLimitEnabled(true);
+        rightMotorConfig.softLimit.forwardSoftLimit(370).forwardSoftLimitEnabled(true);
 
         leftMotor.configure(leftMotorConfig, SparkMax.ResetMode.kResetSafeParameters, SparkMax.PersistMode.kPersistParameters);
         rightMotor.configure(rightMotorConfig, SparkMax.ResetMode.kResetSafeParameters, SparkMax.PersistMode.kPersistParameters);
-
-        leftEncoder.setPosition(0);
-
-        table = NetworkTableInstance.getDefault().getTable("Elevator");
-
-        kPEntry = table.getEntry("kP");
-        kIEntry = table.getEntry("kI");
-        kDEntry = table.getEntry("kD");
-        kSEntry = table.getEntry("kS");
-        kGEntry = table.getEntry("kG");
-        kVEntry = table.getEntry("kV");
-        kAEntry = table.getEntry("kA");
-        profiledSetpointEntry = table.getEntry("Profiled Setpoint");
-        setpointEntry = table.getEntry("Setpoint");
-        encoderPositionEntry = table.getEntry("Encoder Position");
-        pidOutputEntry = table.getEntry("PID Output");
-        feedforwardOutputEntry = table.getEntry("Feedforward Output");
-
-        kPEntry.setDouble(kP);
-        kIEntry.setDouble(kI);
-        kDEntry.setDouble(kD);
-        kSEntry.setDouble(kS);
-        kGEntry.setDouble(kG);
-        kVEntry.setDouble(kV);
-        kAEntry.setDouble(kA);
-        profiledSetpointEntry.setDouble(0.25);
-        setpointEntry.setDouble(0);
-
-        feedforward = new ElevatorFeedforward(kS, kG, kV, kA);
-        pidElevator = new ProfiledPIDController(kP, kI, kD, 
-            new TrapezoidProfile.Constraints(
-                feedforward.maxAchievableVelocity(12, 0), 
-                feedforward.maxAchievableAcceleration(12, 0)
-            )
-        );
+        
+        //encoderConfig.positionConversionFactor((2 * Math.PI) / 9); //Motor rotations to elevator linear inches. 9:1 gear ratio that drives a 2in diameter gear, which drives the elevator
     }
 
-    private double getCurrentPosition() {
-        return leftEncoder.getPosition();
+    public double getCurrentPosition() {
+        return leftMotor.getEncoder().getPosition();
     }
 
-    @Override
-    public void periodic() {
-        encoderPositionEntry.setDouble(getCurrentPosition());
-    }
-
-    public void moveToPosition(double position) {
-        setpointEntry.setDouble(position);
-
-        kP = kPEntry.getDouble(kP);
-        kI = kIEntry.getDouble(kI);
-        kD = kDEntry.getDouble(kD);
-        kS = kSEntry.getDouble(kS);
-        kG = kGEntry.getDouble(kG);
-        kV = kVEntry.getDouble(kV);
-        kA = kAEntry.getDouble(kA);
-
-        feedforward = new ElevatorFeedforward(kS, kG, kV, kA);
-        pidElevator.setPID(kP, kI, kD);
-
-        TrapezoidProfile.State goal = new TrapezoidProfile.State(position, 0);
-        double pidOutput = pidElevator.calculate(getCurrentPosition(), goal.position);
-        profiledSetpointEntry.setDouble(pidElevator.getSetpoint().velocity);
-        double feedforwardOutput = feedforward.calculate(pidElevator.getSetpoint().velocity);
-
-        pidOutputEntry.setDouble(pidOutput);
-        feedforwardOutputEntry.setDouble(feedforwardOutput);
-
-        leftMotor.setVoltage(pidOutput + feedforwardOutput);
-    }
-      public void moveUp() {
+    public void moveUp() {
         leftMotor.set(kManualSpeed);
+        rightMotor.set(kManualSpeed);
     }
 
     public void moveDown() {
-        leftMotor.set(-kManualSpeed);
+            leftMotor.set(-kManualSpeed);
+            rightMotor.set(-kManualSpeed);
+    }
+
+    public void moveToPosition(double position) {
+        new Thread(() -> {
+            while (true) {
+                double current = getCurrentPosition();
+                double error = position - current;
+
+                System.out.println("Elevator current: " + current + ", target: " + position + ", error: " + error);
+
+                // Stop the elevator if within deadband
+                if (Math.abs(error) < DEAD_BAND) {
+                    System.out.println("Elevator reached target. Stopping.");
+                    stop();
+                    break;
+                }
+
+                double output = (kP * error) + FEEDFORWARD;
+
+                // Ensure a minimum output to overcome static friction
+                if (Math.abs(output) < MIN_OUTPUT) {
+                    output = Math.copySign(MIN_OUTPUT, output);
+                }
+
+                // Limit output to max manual speed
+                if (output > kManualSpeed) output = kManualSpeed;
+                if (output < -kManualSpeed) output = -kManualSpeed;
+
+                leftMotor.set(output);
+                rightMotor.set(output);
+
+                try {
+                    Thread.sleep(50); // Update every 50ms
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
     }
 
     public void stop() {
         leftMotor.set(0);
+        rightMotor.set(0);
     }
+
+    public void periodic() {
+        System.out.println("Left encoder: "+ leftEncoder.getPosition());
+        System.out.println("Right encoder: "+ rightEncoder.getPosition());
+    }
+    
 }

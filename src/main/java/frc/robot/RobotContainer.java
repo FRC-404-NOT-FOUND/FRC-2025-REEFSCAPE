@@ -102,8 +102,7 @@ public class RobotContainer {
     new JoystickButton(m_driverController, XboxController.Button.kStart.value)
         .onTrue(new InstantCommand(
             () -> algaePivot.setTargetPosition(Constants.AlgaePivot.UP_POSITION), algaePivot));
-  
-    // Triggers -> move elevator to setpoints (press once)
+            
     m_commandController.rightTrigger()
         .onTrue(new InstantCommand(
             () -> elevator.moveToPosition(Constants.Elevator.POS1), elevator));
