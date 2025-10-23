@@ -35,6 +35,8 @@ public class RobotContainer {
 
   public RobotContainer() {
     configureButtonBindings();
+
+    // Default drive: arcade/curvature style with deadbands and field-relative toggle
     m_robotDrive.setDefaultCommand(
         new RunCommand(
             () ->
@@ -47,54 +49,68 @@ public class RobotContainer {
   }
 
   public void teleopInit() {
-    algaePivot.enableTeleopControl(false);
+    algaePivot.enableTeleopControl(false); // keep current target unless Robot.teleopInit forces DOWN
     climber.unlockClimb();
-    System.out.println("Teleoperated Mode Initialized: Algae pivot remains in position.");
+    System.out.println("Teleoperated Mode Initialized: Algae pivot teleop control enabled.");
   }
 
   public void autonomousInit() {
     algaePivot.disableTeleopControl();
-    System.out.println("Autonomous Mode Initialized: Algae pivot locked in up position.");
+    System.out.println("Autonomous Mode Initialized: Algae pivot locked in UP position.");
   }
 
   public Elevator getElevator() {
     return elevator;
   }
 
+  public AlgaePivot getAlgaePivot() {
+    return algaePivot;
+  }
+
   private void configureButtonBindings() {
+    // Intake controls
     new JoystickButton(m_driverController, XboxController.Button.kX.value)
         .onTrue(new RunCommand(algaeIntake::startIntake, algaeIntake));
-
+  
     new JoystickButton(m_driverController, XboxController.Button.kY.value)
         .onTrue(new RunCommand(algaeIntake::holdIntake, algaeIntake));
-
+  
     new JoystickButton(m_driverController, XboxController.Button.kB.value)
-        .onTrue(new RunCommand(algaeIntake::startOuttake, algaeIntake));
-
+        .onTrue(
+            new InstantCommand(algaeIntake::startOuttake, algaeIntake)
+                .andThen(new WaitCommand(1.0))
+                .finallyDo(interrupted -> algaeIntake.stop())
+        );
+  
     new JoystickButton(m_driverController, XboxController.Button.kA.value)
         .onTrue(new RunCommand(algaeIntake::stop, algaeIntake));
-
+  
+    // Elevator manual jog
     new JoystickButton(m_driverController, XboxController.Button.kRightBumper.value)
         .whileTrue(new RunCommand(elevator::moveUp, elevator))
         .onFalse(new RunCommand(elevator::stop, elevator));
-
+  
     new JoystickButton(m_driverController, XboxController.Button.kLeftBumper.value)
         .whileTrue(new RunCommand(elevator::moveDown, elevator))
         .onFalse(new RunCommand(elevator::stop, elevator));
-
-    new JoystickButton(m_driverController, XboxController.Button.kStart.value)
-        .onTrue(new InstantCommand(() -> algaePivot.setTargetPosition(Constants.AlgaePivot.UP_POSITION)));
-
+  
+    // Pivot presets
     new JoystickButton(m_driverController, XboxController.Button.kBack.value)
-        .onTrue(new InstantCommand(() -> algaePivot.setTargetPosition(Constants.AlgaePivot.DOWN_POSITION)));
+        .onTrue(new InstantCommand(
+            () -> algaePivot.setTargetPosition(Constants.AlgaePivot.DOWN_POSITION), algaePivot));
+  
+    new JoystickButton(m_driverController, XboxController.Button.kStart.value)
+        .onTrue(new InstantCommand(
+            () -> algaePivot.setTargetPosition(Constants.AlgaePivot.UP_POSITION), algaePivot));
+  
+    // Triggers -> move elevator to setpoints (press once)
+    m_commandController.rightTrigger()
+        .onTrue(new InstantCommand(
+            () -> elevator.moveToPosition(Constants.Elevator.POS1), elevator));
 
     m_commandController.leftTrigger()
-        .whileTrue(new RunCommand(climber::moveBackward, climber))
-        .onFalse(new RunCommand(climber::stop, climber));
-
-    m_commandController.rightTrigger()
-        .whileTrue(new RunCommand(climber::moveForward, climber))
-        .onFalse(new RunCommand(climber::stop, climber));
+        .onTrue(new InstantCommand(
+            () -> elevator.moveToPosition(Constants.Elevator.POS2), elevator));
 
     new JoystickButton(m_driverController, XboxController.Button.kRightStick.value)
         .onTrue(new InstantCommand(m_robotDrive::toggleFieldRelative));
@@ -109,35 +125,38 @@ public class RobotContainer {
         new StartEndCommand(() -> m_robotDrive.drive(-0.1, 0, 0, false),
                             () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1),
-        new InstantCommand(() -> algaePivot.enableTeleopControl(true)),
+
+        new InstantCommand(() -> algaePivot.enableTeleopControl(true)), // allow pivot down if desired
         new WaitCommand(0.5),
+
         new InstantCommand(() -> elevator.moveToPosition(215)),
         new WaitUntilCommand(() -> Math.abs(elevator.getCurrentPosition() - 225) < 10),
-        new InstantCommand(() -> {
-          System.out.println("Intake Started!");
-          algaeIntake.startIntake();
-        }, algaeIntake),
+
+        new InstantCommand(algaeIntake::startIntake, algaeIntake),
         new WaitCommand(0.5),
+
         new StartEndCommand(() -> m_robotDrive.drive(0.1, 0, 0, false),
                             () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1),
+
         new WaitCommand(0.5),
         new InstantCommand(algaeIntake::holdIntake, algaeIntake),
+
         new StartEndCommand(() -> m_robotDrive.drive(-0.1, 0, 0, false),
                             () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1),
+
         new StartEndCommand(() -> m_robotDrive.drive(0, 0, 0.25, false),
                             () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
             .withTimeout(1.0),
+
         new ParallelCommandGroup(
             new StartEndCommand(() -> m_robotDrive.drive(0.3, 0, 0, false),
                                 () -> m_robotDrive.drive(0, 0, 0, false), m_robotDrive)
                 .withTimeout(2.65),
-            new InstantCommand(() -> {
-              System.out.println("Lowering elevator to position 80...");
-              elevator.moveToPosition(80);
-            })
+            new InstantCommand(() -> elevator.moveToPosition(80))
         ),
+
         new WaitUntilCommand(() -> Math.abs(elevator.getCurrentPosition() - 80) < 10),
         new InstantCommand(algaeIntake::startOuttake, algaeIntake)
     );

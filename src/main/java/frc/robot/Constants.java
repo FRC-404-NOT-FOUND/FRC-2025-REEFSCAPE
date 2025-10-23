@@ -108,7 +108,10 @@ public final class Constants {
     public static final int LEFT_ELEVATOR_CAN_ID = 5;
     public static final int RIGHT_ELEVATOR_CAN_ID = 6;
 
+    public static final double POS1 =  100;
+    public static final double POS2 = 10;
 }
+
 
   public static final class ClimberConstants {
     public static final int CLIMBER_CAN_ID = 13;
