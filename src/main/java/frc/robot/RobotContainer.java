@@ -10,6 +10,7 @@ import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.StartEndCommand;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 import frc.robot.subsystems.AlgaeIntake;
@@ -98,6 +99,9 @@ public class RobotContainer {
 
     new JoystickButton(m_driverController, XboxController.Button.kRightStick.value)
         .onTrue(new InstantCommand(m_robotDrive::toggleFieldRelative));
+
+    new JoystickButton(m_driverController, XboxController.Button.kLeftStick.value)
+        .onTrue(Commands.startRun(elevator::resetTimer, () -> elevator.moveToPosition(10), elevator));
   }
 
   public SequentialCommandGroup getAutonomousCommand() {
@@ -112,7 +116,7 @@ public class RobotContainer {
         new InstantCommand(() -> algaePivot.enableTeleopControl(true)),
         new WaitCommand(0.5),
         new InstantCommand(() -> elevator.moveToPosition(215)),
-        new WaitUntilCommand(() -> Math.abs(elevator.getCurrentPosition() - 225) < 10),
+        //new WaitUntilCommand(() -> Math.abs(elevator.getCurrentPosition() - 225) < 10),
         new InstantCommand(() -> {
           System.out.println("Intake Started!");
           algaeIntake.startIntake();
@@ -138,7 +142,7 @@ public class RobotContainer {
               elevator.moveToPosition(80);
             })
         ),
-        new WaitUntilCommand(() -> Math.abs(elevator.getCurrentPosition() - 80) < 10),
+        //new WaitUntilCommand(() -> Math.abs(elevator.getCurrentPosition() - 80) < 10),
         new InstantCommand(algaeIntake::startOuttake, algaeIntake)
     );
   }
