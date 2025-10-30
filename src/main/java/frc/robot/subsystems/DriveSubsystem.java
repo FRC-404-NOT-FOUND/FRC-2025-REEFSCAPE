@@ -14,6 +14,9 @@ import edu.wpi.first.wpilibj.ADIS16448_IMU;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.DriveConstants;
 
+// OVERALL TODO: Tune auto align PID, write code for pose estimation based on ApilTags
+//      -> See lines 64 & 90
+
 public class DriveSubsystem extends SubsystemBase {
   private final MAXSwerveModule m_frontLeft = new MAXSwerveModule(
       DriveConstants.kFrontLeftDrivingCanId,
@@ -57,6 +60,12 @@ public class DriveSubsystem extends SubsystemBase {
           m_rearRight.getPosition()
       });
 
+  private final trajectoryController = new HolonomicDriveController(
+      //TODO: tune all three controllers + set Constants
+      new PIDController(0, 0, 0), new PIDController(0, 0, 0),
+      new ProfiledPIDController(0, 0, 0,
+                                new TrapezoidProfile.Constraints(DriveConstants.kMaxAngularVelocity, DriveConstants.kMaxAngularAcceleration)));
+
   public DriveSubsystem() {
     HAL.report(tResourceType.kResourceType_RobotDrive, tInstances.kRobotDriveSwerve_MaxSwerve);
   }
@@ -77,6 +86,10 @@ public class DriveSubsystem extends SubsystemBase {
             m_rearLeft.getPosition(),
             m_rearRight.getPosition()
         });
+
+    // TODO: IF apil tag detected then update odometry with estimated distance
+    // note: do i also have to add logic to make sure encoder/gyro pos are based off of most recent apil tag? make sure to research
+
   }
 
   public Pose2d getPose() {
@@ -123,6 +136,24 @@ public class DriveSubsystem extends SubsystemBase {
     m_frontRight.setDesiredState(swerveModuleStates[1]);
     m_rearLeft.setDesiredState(swerveModuleStates[2]);
     m_rearRight.setDesiredState(swerveModuleStates[3]);
+  }
+
+    public void autoAlign(double x, double y, double rot) {
+      Pose2D targetPose = new Pose2D(x, y, Rotation2D.fromDegrees(rot)); // Distance = meters; theta = radians; by default
+      Pose2D currentPose = new Pose2D(getPose().getX(), getPose().getY(), getPose().getRotation());
+      Pose2D errorPose = currentPose.relativeTo(targetPose);
+
+      if(Math.abs(errorPose.getX()) < 0.3 && Math.abs(errorPose.getY()) < 0.3 && Math.abs(errorPose.getRotation().getDegrees()) < 45) { 
+          // must be within 0.3 meters and 45 degrees of goal
+          //    -> theoretically prevents driver from accidentally pressing button
+          //       and attempting auto align from half way across field
+          ChassisSpeeds adjustedSpeeds = trajectoryController.calculate(
+              currentPose, targetPose, targetPose.getRotation);
+
+          SwerveModuleState[] moduleStates = kinematics.toSwerveModuleStates(adjustedSpeeds);
+          setModuleStates(moduleStates);
+      }
+      
   }
 
   public void setX() {
