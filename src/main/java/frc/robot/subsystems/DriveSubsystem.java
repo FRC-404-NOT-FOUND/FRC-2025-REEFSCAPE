@@ -10,12 +10,15 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.ProfiledPIDController;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.ADIS16448_IMU;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.DriveConstants;
 
 // OVERALL TODO: Tune auto align PID, write code for pose estimation based on ApilTags
-//      -> See lines 64 & 90
+//      -> See lines 66 & 93
 
 public class DriveSubsystem extends SubsystemBase {
   private final MAXSwerveModule m_frontLeft = new MAXSwerveModule(
@@ -60,11 +63,11 @@ public class DriveSubsystem extends SubsystemBase {
           m_rearRight.getPosition()
       });
 
-  private final trajectoryController = new HolonomicDriveController(
-      //TODO: tune all three controllers + set Constants
-      new PIDController(0, 0, 0), new PIDController(0, 0, 0),
-      new ProfiledPIDController(0, 0, 0,
-                                new TrapezoidProfile.Constraints(DriveConstants.kMaxAngularVelocity, DriveConstants.kMaxAngularAcceleration)));
+    //TODO: tune all three controllers + set Constants
+    PIDController xController = new PIDController(0, 0, 0);
+    PIDController yController = new PIDController(0, 0, 0);
+    ProfiledPIDController thetaController = new ProfiledPIDController(0, 0, 0,
+      new TrapezoidProfile.Constraints(DriveConstants.kMaxAngularVelocity, DriveConstants.kMaxAngularAcceleration));
 
   public DriveSubsystem() {
     HAL.report(tResourceType.kResourceType_RobotDrive, tInstances.kRobotDriveSwerve_MaxSwerve);
@@ -118,7 +121,7 @@ public class DriveSubsystem extends SubsystemBase {
   public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative) {
     double xSpeedDelivered = xSpeed * DriveConstants.kMaxSpeedMetersPerSecond;
     double ySpeedDelivered = ySpeed * DriveConstants.kMaxSpeedMetersPerSecond;
-    double rotDelivered = rot * DriveConstants.kMaxAngularSpeed;
+    double rotDelivered = rot * DriveConstants.kMaxAngularVelocity;
 
     var swerveModuleStates = DriveConstants.kDriveKinematics.toSwerveModuleStates(
         fieldRelative
@@ -139,18 +142,20 @@ public class DriveSubsystem extends SubsystemBase {
   }
 
     public void autoAlign(double x, double y, double rot) {
-      Pose2D targetPose = new Pose2D(x, y, Rotation2D.fromDegrees(rot)); // Distance = meters; theta = radians; by default
-      Pose2D currentPose = new Pose2D(getPose().getX(), getPose().getY(), getPose().getRotation());
-      Pose2D errorPose = currentPose.relativeTo(targetPose);
+      Pose2d targetPose = new Pose2d(x, y, Rotation2d.fromDegrees(rot)); // Distance = meters; theta = radians; by default
+      Pose2d currentPose = new Pose2d(getPose().getX(), getPose().getY(), getPose().getRotation());
+      Pose2d errorPose = currentPose.relativeTo(targetPose);
 
       if(Math.abs(errorPose.getX()) < 0.3 && Math.abs(errorPose.getY()) < 0.3 && Math.abs(errorPose.getRotation().getDegrees()) < 45) { 
           // must be within 0.3 meters and 45 degrees of goal
           //    -> theoretically prevents driver from accidentally pressing button
           //       and attempting auto align from half way across field
-          ChassisSpeeds adjustedSpeeds = trajectoryController.calculate(
-              currentPose, targetPose, targetPose.getRotation);
+          double xSpeed = xController.calculate(currentPose.getX(), targetPose.getX());
+          double ySpeed = yController.calculate(currentPose.getY(), targetPose.getY());
+          double rotSpeed = thetaController.calculate(currentPose.getRotation().getRadians(), targetPose.getRotation().getRadians());
 
-          SwerveModuleState[] moduleStates = kinematics.toSwerveModuleStates(adjustedSpeeds);
+          ChassisSpeeds adjustedSpeeds = new ChassisSpeeds(xSpeed, ySpeed, rotSpeed);
+          SwerveModuleState[] moduleStates = DriveConstants.kDriveKinematics.toSwerveModuleStates(adjustedSpeeds);
           setModuleStates(moduleStates);
       }
       
