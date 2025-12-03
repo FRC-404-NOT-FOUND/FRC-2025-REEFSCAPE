@@ -109,6 +109,8 @@ public final class Constants {
     public static final int LEFT_ELEVATOR_CAN_ID = 5;
     public static final int RIGHT_ELEVATOR_CAN_ID = 6;
 
+    public static final double sprocketDiameter = 0.25 / Math.sin(Math.PI / 22.0); // #25 chain, 22 teeth
+
 }
 
   public static final class ClimberConstants {

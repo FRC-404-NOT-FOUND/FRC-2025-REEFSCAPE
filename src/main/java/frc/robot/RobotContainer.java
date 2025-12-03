@@ -101,7 +101,7 @@ public class RobotContainer {
         .onTrue(new InstantCommand(m_robotDrive::toggleFieldRelative));
 
     new JoystickButton(m_driverController, XboxController.Button.kLeftStick.value)
-        .onTrue(Commands.startRun(elevator::resetTimer, () -> elevator.moveToPosition(10), elevator));
+        .onTrue(Commands.startRun(elevator::resetSetpoint, () -> elevator.moveToPosition(5), elevator));
   }
 
   public SequentialCommandGroup getAutonomousCommand() {

@@ -26,14 +26,14 @@ public class Elevator extends SubsystemBase {
 
     private final double kManualSpeed = 0.2;
 
-    private double kP = 0.0;
+    private double kP = 0.4; //still tuning, increase
     private double kI = 0.0;
     private double kD = 0.0;
 
-    private double kV = 0.0;
+    private double kV = 0.08;
     private double kA = 0.0;
-    private double kS = 0.315; // Probably just gonna have to redo kS and kG. In fact I would be shocked if I didnt
-    private double kG = 0.605;
+    private double kS = 0.31;
+    private double kG = 0.66;
 
     private double flatVoltage = 0.0; //testing tool to find kG and kS. can be deleted afterwards. systems of equations type sauce
 
@@ -41,7 +41,9 @@ public class Elevator extends SubsystemBase {
     private ElevatorFeedforward e_feedforward = new ElevatorFeedforward(kS, kG, kV, kA);
 
     private final TrapezoidProfile e_profile = new TrapezoidProfile(
-			new TrapezoidProfile.Constraints(5, 5)); // in/s and in/s/s 
+			new TrapezoidProfile.Constraints(2, 2)); // in/s and in/s/s 
+    private TrapezoidProfile.State startingState;
+
 
     // NetworkTables
     private final NetworkTable elevatorTable;
@@ -57,14 +59,16 @@ public class Elevator extends SubsystemBase {
         leftMotorConfig.inverted(true);
         leftMotorConfig.softLimit.reverseSoftLimit(3).reverseSoftLimitEnabled(true);
         leftMotorConfig.softLimit.forwardSoftLimit(55).forwardSoftLimitEnabled(true);
-        leftMotorConfig.alternateEncoder.positionConversionFactor((Math.PI * Constants.Elevator.sprocketDiameter) / 9); // returns inches. 9:1 gearbox
-        leftMotorConfig.alternateEncoder.velocityConversionFactor((Math.PI * Constants.Elevator.sprocketDiameter) / 9 / 60); // returns inches per second
+        leftMotorConfig.encoder.positionConversionFactor((Math.PI * Constants.Elevator.sprocketDiameter) / 9); // returns inches. 9:1 gearbox
+        leftMotorConfig.encoder.velocityConversionFactor((Math.PI * Constants.Elevator.sprocketDiameter) / 9 / 60); // returns inches per second
 
         rightMotorConfig = new SparkMaxConfig();
         rightMotorConfig.inverted(false);
         rightMotorConfig.idleMode(SparkMaxConfig.IdleMode.kBrake);
         rightMotorConfig.softLimit.reverseSoftLimit(3).reverseSoftLimitEnabled(true);
         rightMotorConfig.softLimit.forwardSoftLimit(55).forwardSoftLimitEnabled(true);
+        rightMotorConfig.encoder.positionConversionFactor((Math.PI * Constants.Elevator.sprocketDiameter) / 9); // returns inches. 9:1 gearbox
+        rightMotorConfig.encoder.velocityConversionFactor((Math.PI * Constants.Elevator.sprocketDiameter) / 9 / 60); // returns inches per second
 
         leftMotor.configure(leftMotorConfig, SparkMax.ResetMode.kResetSafeParameters, SparkMax.PersistMode.kPersistParameters);
         rightMotor.configure(rightMotorConfig, SparkMax.ResetMode.kResetSafeParameters, SparkMax.PersistMode.kPersistParameters);
@@ -105,6 +109,7 @@ public class Elevator extends SubsystemBase {
 
         // Publish actual position for graphing
         elevatorTable.getEntry("ActualPosition").setDouble(leftEncoder.getPosition());
+        elevatorTable.getEntry("ActualVelocity").setDouble(leftEncoder.getVelocity());
     }
 
     public void moveUp() {
@@ -117,14 +122,14 @@ public class Elevator extends SubsystemBase {
         rightMotor.set(-kManualSpeed);
     }
 
-    public void resetTimer() {
+    public void resetSetpoint() {
         e_timer.restart();
+        startingState = new TrapezoidProfile.State(leftEncoder.getPosition(), leftEncoder.getVelocity());
     }
 
     public void moveToPosition(double targetPosition) {
         double time = e_timer.get();
 
-        var startingState = new TrapezoidProfile.State(leftEncoder.getPosition(), leftEncoder.getVelocity());
         var goalState = new TrapezoidProfile.State(targetPosition, 0);
 
         TrapezoidProfile.State currentState = e_profile.calculate(time, startingState, goalState);
@@ -140,6 +145,7 @@ public class Elevator extends SubsystemBase {
 
         // Publish desired position for graphing
         elevatorTable.getEntry("TargetPosition").setDouble(currentState.position);
+        elevatorTable.getEntry("TargetVelocity").setDouble(currentState.velocity);
         elevatorTable.getEntry("AppliedVoltage").setDouble(motorOutput);
     }
 
