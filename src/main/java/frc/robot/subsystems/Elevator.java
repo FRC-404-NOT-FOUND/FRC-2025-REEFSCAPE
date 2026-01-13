@@ -24,16 +24,16 @@ public class Elevator extends SubsystemBase {
     private final SparkMaxConfig leftMotorConfig;
     private final SparkMaxConfig rightMotorConfig;
 
-    private final double kManualSpeed = 0.2;
+    private final double kManualSpeed = 0; //0.2 out of testing
 
     private double kP = 0.4; //still tuning, increase
     private double kI = 0.0;
     private double kD = 0.0;
 
     private double kV = 0.08;
-    private double kA = 0.0;
-    private double kS = 0.31;
-    private double kG = 0.66;
+    private double kA = 0.06;
+    private double kS = 0.79;
+    private double kG = 0.25;
 
     private double flatVoltage = 0.0; //testing tool to find kG and kS. can be deleted afterwards. systems of equations type sauce
 
@@ -41,7 +41,7 @@ public class Elevator extends SubsystemBase {
     private ElevatorFeedforward e_feedforward = new ElevatorFeedforward(kS, kG, kV, kA);
 
     private final TrapezoidProfile e_profile = new TrapezoidProfile(
-			new TrapezoidProfile.Constraints(2, 2)); // in/s and in/s/s 
+			new TrapezoidProfile.Constraints(4, 4)); // in/s and in/s/s 
     private TrapezoidProfile.State startingState;
 
 
@@ -113,13 +113,13 @@ public class Elevator extends SubsystemBase {
     }
 
     public void moveUp() {
-        leftMotor.set(kManualSpeed);
-        rightMotor.set(kManualSpeed);
+        leftMotor.setVoltage(kManualSpeed + flatVoltage);
+        rightMotor.setVoltage(kManualSpeed + flatVoltage);
     }
 
     public void moveDown() {
-        leftMotor.set(-kManualSpeed);
-        rightMotor.set(-kManualSpeed);
+        leftMotor.setVoltage(-kManualSpeed);
+        rightMotor.setVoltage(-kManualSpeed);
     }
 
     public void resetSetpoint() {

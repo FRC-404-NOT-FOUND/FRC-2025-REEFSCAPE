@@ -1,7 +1,6 @@
 package frc.robot;
 
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
@@ -9,7 +8,6 @@ import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.StartEndCommand;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
-import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
@@ -31,8 +29,6 @@ public class RobotContainer {
       new XboxController(OIConstants.kDriverControllerPort);
   private final CommandXboxController m_commandController =
       new CommandXboxController(OIConstants.kDriverControllerPort);
-
-  private final Timer autonomousTimer = new Timer();
 
   public RobotContainer() {
     configureButtonBindings();
@@ -101,7 +97,7 @@ public class RobotContainer {
         .onTrue(new InstantCommand(m_robotDrive::toggleFieldRelative));
 
     new JoystickButton(m_driverController, XboxController.Button.kLeftStick.value)
-        .onTrue(Commands.startRun(elevator::resetSetpoint, () -> elevator.moveToPosition(5), elevator));
+        .onTrue(Commands.startRun(elevator::resetSetpoint, () -> elevator.moveToPosition(7), elevator));
   }
 
   public SequentialCommandGroup getAutonomousCommand() {
