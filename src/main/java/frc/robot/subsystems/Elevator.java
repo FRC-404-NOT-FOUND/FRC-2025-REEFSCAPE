@@ -41,7 +41,7 @@ public class Elevator extends SubsystemBase {
     private ElevatorFeedforward e_feedforward = new ElevatorFeedforward(kS, kG, kV, kA);
 
     private final TrapezoidProfile e_profile = new TrapezoidProfile(
-			new TrapezoidProfile.Constraints(4, 4)); // in/s and in/s/s 
+			new TrapezoidProfile.Constraints(12, 12)); // in/s and in/s/s 
     private TrapezoidProfile.State startingState;
 
 
